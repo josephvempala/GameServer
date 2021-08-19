@@ -1,37 +1,65 @@
 ﻿using Shared;
-using System.Threading.Tasks;
 
 namespace Server
 {
     public static class ServerSend
     {
-        private static async Task SendTCPPacket(int clientId, Packet packet)
+        private static void SendTCPPacket(int clientId, Packet packet)
         {
             packet.WriteLength();
-            await Server.clients[clientId].Tcp.SendAsync(packet).ConfigureAwait(false);
+            _ = Server.clients[clientId].Tcp.SendAsync(packet).ConfigureAwait(false);
         }
 
-        private static async Task SendUDPPacket(int clientId, Packet packet)
+        private static void SendTCPPacketToAllButClient(int clientId, Packet packet)
         {
             packet.WriteLength();
-            await Server.clients[clientId].Udp.SendAsync(packet).ConfigureAwait(false);
+            foreach (var client in Server.clients)
+                if (client.Key != clientId)
+                    _ = client.Value.Tcp.SendAsync(packet).ConfigureAwait(false);
         }
 
-        public static async Task Welcome(int clientId, string message)
+        private static void SendTCPPacketToAll(Packet packet)
+        {
+            packet.WriteLength();
+            foreach (var client in Server.clients)
+                _ = client.Value.Tcp.SendAsync(packet).ConfigureAwait(false);
+        }
+
+        private static void SendUDPPacket(int clientId, Packet packet)
+        {
+            _ = Server.clients[clientId].Udp.SendAsync(packet).ConfigureAwait(false);
+        }
+
+        private static void SendUDPPacketToAllButClient(int clientId, Packet packet)
+        {
+            foreach (var client in Server.clients)
+                if (client.Key != clientId)
+                    _ = client.Value.Udp.SendAsync(packet).ConfigureAwait(false);
+        }
+
+        private static void SendUDPPacketToAll(Packet packet)
+        {
+            foreach (var client in Server.clients)
+                _ = client.Value.Udp.SendAsync(packet).ConfigureAwait(false);
+        }
+
+        public static void Welcome(int clientId, string message)
         {
             using (Packet packet = new Packet((int)ServerPackets.welcome))
             {
+                packet.Write(clientId);
                 packet.Write(message);
-                await SendTCPPacket(clientId, packet).ConfigureAwait(false);
+                SendTCPPacket(clientId, packet);
             }
         }
 
-        public static async Task UdpTest(int clientId, string message)
+        public static void Message(int clientId, string message)
         {
-            using (Packet packet = new Packet((int)ServerPackets.udpTest))
+            using (Packet packet = new Packet((int)ServerPackets.message))
             {
+                packet.Write(clientId);
                 packet.Write(message);
-                await SendUDPPacket(clientId, packet).ConfigureAwait(false);
+                SendUDPPacketToAll(packet);
             }
         }
     }

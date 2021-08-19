@@ -1,6 +1,5 @@
 ﻿using Shared;
 using System;
-using System.Threading.Tasks;
 
 namespace Server
 {
@@ -10,7 +9,13 @@ namespace Server
         {
             string message = packet.ReadString();
             Console.WriteLine($"{client_id} says {message}");
-            ServerSend.UdpTest(client_id, message);
+        }
+
+        public static void MessageReceived(int client_id, Packet packet)
+        {
+            string message = packet.ReadString();
+            Console.WriteLine($"{message} from udp client {client_id}");
+            ServerSend.Message(client_id, message);
         }
     }
 }

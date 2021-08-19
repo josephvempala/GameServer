@@ -1,7 +1,5 @@
 ﻿using Shared;
 using System.Net;
-using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server.client
@@ -23,18 +21,16 @@ namespace Server.client
 
         public async Task SendAsync(Packet packet)
         {
-            await Server.SendUDPData(endPoint, packet).ConfigureAwait(false);
+            await Server.SendUDPDataAsync(endPoint, packet).ConfigureAwait(false);
         }
 
-        public void HandleData(Packet packet)
+        public void HandleData(byte[] data)
         {
-            int packetLength = packet.ReadInt();
-            byte[] data = packet.ReadBytes(packetLength);
-
             TickManager.ExecuteOnTick(() =>
             {
-                using (Packet _packet = new Packet(data))
+                using (Packet packet = new Packet(data))
                 {
+                    int clientId = packet.ReadInt();
                     int packetId = packet.ReadInt();
                     Server.packetHandlers[packetId].Invoke(id, packet);
                 }
@@ -43,7 +39,7 @@ namespace Server.client
 
         public void Disconnect()
         {
-            
+
         }
     }
 }

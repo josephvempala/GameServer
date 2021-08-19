@@ -7,14 +7,14 @@ namespace Shared
     public enum ServerPackets
     {
         welcome = 1,
-        udpTest
+        message
     }
 
     /// <summary>Sent from client to server.</summary>
     public enum ClientPackets
     {
         welcomeReceived = 1,
-        udpTestReceived
+        message
     }
 
     public class Packet : IDisposable

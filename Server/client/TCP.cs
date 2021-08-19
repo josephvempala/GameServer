@@ -1,7 +1,7 @@
 ﻿using Shared;
 using System;
+using System.Buffers;
 using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server.client
@@ -10,15 +10,12 @@ namespace Server.client
     {
         private Socket socket;
         private NetworkStream stream;
-        private byte[] receiveBuffer;
         private Packet receivedData;
-        private CancellationTokenSource cts;
         private int id;
 
         public TCP(int id)
         {
             this.id = id;
-            cts = new();
         }
 
         public void Connect(Socket socket)
@@ -29,9 +26,7 @@ namespace Server.client
 
             stream = new NetworkStream(socket);
 
-            receiveBuffer = new byte[Constants.MAX_BUFFER_SIZE];
-
-            _ = Task.Run(ReceiveLoop, cts.Token);
+            _ = Task.Run(ReceiveLoop);
         }
 
         public async Task SendAsync(Packet packet)
@@ -42,15 +37,15 @@ namespace Server.client
 
         private async Task ReceiveLoop()
         {
-            while (!cts.Token.IsCancellationRequested)
+            while (true)
             {
                 receivedData = new Packet();
-
-                int bytes_read = await stream.ReadAsync(receiveBuffer, 0, Constants.MAX_BUFFER_SIZE, cts.Token).ConfigureAwait(false);
+                var receiveBuffer = ArrayPool<byte>.Shared.Rent(4096);
+                int bytes_read = await stream.ReadAsync(receiveBuffer, 0, Constants.MAX_BUFFER_SIZE).ConfigureAwait(false);
                 if (bytes_read == 0)
                 {
                     Server.clients[id].Disconnect();
-                    return;
+                    continue;
                 }
 
                 byte[] data_read = new byte[bytes_read];
@@ -103,11 +98,9 @@ namespace Server.client
 
         public void Disconnect()
         {
-            cts.Cancel();
             socket.Close();
             stream.Close();
             receivedData.Dispose();
-            cts.Dispose();
         }
     }
 }

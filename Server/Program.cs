@@ -9,10 +9,9 @@ namespace Server
 
         public static void Main(string[] args)
         {
-            //Server.Start(int.Parse(args[0]), int.Parse(args[1]));
-            Server.Start(16, 7787);
+            Server.Start(int.Parse(args[0]), int.Parse(args[1]));
             isRunning = true;
-            _ = StartUpdateTicks();
+            _ = Task.Run(StartUpdateTicks);
             Console.ReadKey();
         }
 

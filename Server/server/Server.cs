@@ -1,6 +1,7 @@
 ﻿using Server.client;
 using Shared;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -12,7 +13,7 @@ namespace Server
     {
         public static int max_clients { get; private set; }
         public static int port { get; private set; }
-        public static Dictionary<int, Client> clients = new();
+        public static Dictionary<int, Client> clients = new Dictionary<int, Client>();
         public delegate void PacketHandler(int client_id, Packet packet);
         public static Dictionary<int, PacketHandler> packetHandlers;
 
@@ -31,44 +32,55 @@ namespace Server
             TCPListner.Bind(ServerEndpoint);
             TCPListner.Listen(128);
 
-            _ = Task.Run(() => TCPListen(TCPListner));
+            _ = Task.Run(TCPListen);
             UDPListner = new Socket(SocketType.Dgram, ProtocolType.Udp);
             UDPListner.Bind(ServerEndpoint);
-            _ = Task.Run(() => UDPListen(UDPListner));
+            _ = Task.Run(UDPListen);
         }
 
-        private static async Task UDPListen(Socket socket)
+        public static async Task SendUDPDataAsync(EndPoint endPoint, Packet packet)
+        {
+            try
+            {
+                if (endPoint != null)
+                {
+                    await SocketTaskExtensions.SendToAsync(UDPListner, new ArraySegment<byte>(packet.ToArray()), SocketFlags.None, endPoint).ConfigureAwait(false);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error encountered while sending UDP data to {endPoint} : {e}");
+            }
+        }
+
+        private static async Task UDPListen()
         {
             while (true)
             {
                 try
                 {
-                    byte[] data = new byte[4096];
-                    var socketReceive = await socket.ReceiveFromAsync(data, SocketFlags.None, new IPEndPoint(IPAddress.Any, 7787)).ConfigureAwait(false);
+                    ArraySegment<byte> data = new ArraySegment<byte>(ArrayPool<byte>.Shared.Rent(4096));
+                    var socketReceive = await SocketTaskExtensions.ReceiveFromAsync(UDPListner, data, SocketFlags.None, new IPEndPoint(IPAddress.Any, 7787)).ConfigureAwait(false);
                     if (socketReceive.ReceivedBytes < 4)
                     {
-                        return;
+                        continue;
                     }
-                    using (Packet packet = new Packet(data))
+                    int clientId = BitConverter.ToInt32(data.Array, 0);
+                    if (clientId <= 0 || clientId > max_clients)
                     {
-                        int clientId = packet.ReadInt();
-                        if (clientId <= 0 || clientId > max_clients)
-                        {
-                            return;
-                        }
-                        if (clients[clientId].Udp.endPoint == null)
-                        {
-                            clients[clientId].Udp.Connect(socketReceive.RemoteEndPoint);
-                            return;
-                        }
-                        else
-                        {
-                            //TODO: handle this condition either disconnect client or something
-                        }
-                        if (socketReceive.RemoteEndPoint.ToString() == clients[clientId].Udp.endPoint.ToString())
-                        {
-                            clients[clientId].Udp.HandleData(packet);
-                        }
+                        continue;
+                    }
+                    if (clients[clientId].Udp.endPoint == null)
+                    {
+                        clients[clientId].Udp.Connect(socketReceive.RemoteEndPoint);
+                        continue;
+                    }
+                    if (socketReceive.RemoteEndPoint.ToString() == clients[clientId].Udp.endPoint.ToString())
+                    {
+                        var packetBytes = new byte[socketReceive.ReceivedBytes];
+                        Array.Copy(data.Array, 0, packetBytes, 0, socketReceive.ReceivedBytes);
+                        ArrayPool<byte>.Shared.Return(data.Array);
+                        clients[clientId].Udp.HandleData(packetBytes);
                     }
                 }
                 catch (Exception e)
@@ -78,32 +90,17 @@ namespace Server
             }
         }
 
-        public static async Task SendUDPData(EndPoint endPoint, Packet packet)
-        {
-            try
-            {
-                if(endPoint != null)
-                {
-                    await UDPListner.SendToAsync(packet.ToArray(), SocketFlags.None, endPoint).ConfigureAwait(false);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Error encountered while sending UDP data to {endPoint} : {e}");
-            }
-        }
-
-        private static async Task TCPListen(Socket socket)
+        private static async Task TCPListen()
         {
             while (true)
             {
-                var item = await Task.Factory.FromAsync(socket.BeginAccept, socket.EndAccept, socket).ConfigureAwait(false);
+                var item = await Task.Factory.FromAsync(TCPListner.BeginAccept, TCPListner.EndAccept, TCPListner).ConfigureAwait(false);
                 Console.WriteLine("Client Connected");
-                await AddClient(item).ConfigureAwait(false);
+                AddClient(item);
             }
         }
 
-        private static async Task AddClient(Socket socket)
+        private static void AddClient(Socket socket)
         {
             for (int i = 1; i <= max_clients; i++)
             {
@@ -112,7 +109,7 @@ namespace Server
                     var client = new Client(i);
                     client.Tcp.Connect(socket);
                     clients.Add(i, client);
-                    await ServerSend.Welcome(i, "Welcome to server").ConfigureAwait(false);
+                    ServerSend.Welcome(i, "Welcome to server");
                     return;
                 }
             }
@@ -124,8 +121,8 @@ namespace Server
         {
             packetHandlers = new Dictionary<int, PacketHandler>
             {
-                { (int)ServerPackets.welcome, ServerHandle.WelcomeReceived },
-
+                { (int)ClientPackets.welcomeReceived, ServerHandle.WelcomeReceived },
+                { (int)ClientPackets.message, ServerHandle.MessageReceived }
             };
         }
     }
