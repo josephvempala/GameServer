@@ -12,7 +12,8 @@ namespace Client
             string item = packet.ReadString();
             Console.WriteLine($"Server says {item}");
             ClientSend.WelcomeReceived("thanq for welcome");
-            Client.udp.Connect(new IPEndPoint(Client.ServerEndpoint.Address, ((IPEndPoint)Client.tcp.socket.LocalEndPoint).Port), Client.ServerEndpoint);
+            Client.udp.localEndPoint = Client.tcp.LocalEndPoint;
+            Client.udp.Connect(Client.ServerEndpoint);
         }
         public static void Message(Packet packet)
         {

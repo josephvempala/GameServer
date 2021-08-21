@@ -1,4 +1,5 @@
-﻿using Shared;
+﻿using Server.client;
+using Shared;
 using System;
 using System.Buffers;
 using System.Net;
@@ -10,17 +11,16 @@ namespace Client
     internal class UDP
     {
         private Socket socket;
-        private EndPoint localEndPoint;
         private EndPoint serverEndPoint;
+        public EndPoint localEndPoint;
 
-        public void Connect(EndPoint LocalEndPoint, EndPoint ServerEndPoint)
+        public void Connect(EndPoint ServerEndPoint)
         {
             try
             {
-                localEndPoint = LocalEndPoint;
                 serverEndPoint = ServerEndPoint;
                 socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
-                socket.Bind(LocalEndPoint);
+                socket.Bind(localEndPoint);
                 using (Packet packet = new Packet())
                 {
                     Send(packet);
@@ -40,13 +40,13 @@ namespace Client
             {
                 try
                 {
-                    byte[] udpBuffer = ArrayPool<byte>.Shared.Rent(4096);
-                    var socketData = await SocketTaskExtensions.ReceiveFromAsync(socket, new ArraySegment<byte>(udpBuffer), SocketFlags.None, localEndPoint).ConfigureAwait(false);
+                    byte[] udpBuffer = ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE);
+                    SocketReceiveFromResult socketData = await SocketTaskExtensions.ReceiveFromAsync(socket, new ArraySegment<byte>(udpBuffer), SocketFlags.None, localEndPoint).ConfigureAwait(false);
                     if (socketData.ReceivedBytes < 4)
                     {
                         continue;
                     }
-                    var received_buffer = new byte[socketData.ReceivedBytes];
+                    byte[] received_buffer = ArrayPool<byte>.Shared.Rent(socketData.ReceivedBytes);
                     Array.Copy(udpBuffer, received_buffer, socketData.ReceivedBytes);
                     ArrayPool<byte>.Shared.Return(udpBuffer);
                     HandleData(udpBuffer);
@@ -54,6 +54,7 @@ namespace Client
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Exception encountered when Receiving UDP packet {ex}");
+                    return;
                 }
             }
         }
@@ -86,14 +87,16 @@ namespace Client
 
         private void HandleData(byte[] data)
         {
-            TickManager.ExecuteOnTick(() =>
-            {
-                using (Packet packet = new Packet(data))
+            Packet packet = new Packet(data);
+            int packetId = packet.ReadInt();
+            if(Client.packetHandlers.ContainsKey(packetId))
+                TickManager.ExecuteOnTick(() =>
                 {
-                    var packetId = packet.ReadInt();
                     Client.packetHandlers[packetId].Invoke(packet);
-                }
-            });
+                    ArrayPool<byte>.Shared.Return(data);
+                    packet.Dispose();
+                });
+
         }
     }
 }

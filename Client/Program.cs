@@ -9,7 +9,7 @@ namespace Client
         public static bool isRunning = false;
         private static void Main(string[] args)
         {
-            var endpoint = new IPEndPoint(IPAddress.Parse(args[0]), int.Parse(args[1]));
+            IPEndPoint endpoint = new IPEndPoint(IPAddress.Parse(args[0]), int.Parse(args[1]));
             Client.Connect(endpoint);
             isRunning = true;
             _ = Task.Run(StartUpdateTicks);
@@ -22,7 +22,7 @@ namespace Client
         public static async Task StartUpdateTicks()
         {
             Console.WriteLine("started client ticks");
-            var nextloop = DateTime.Now;
+            DateTime nextloop = DateTime.Now;
             while (isRunning)
             {
                 while (nextloop < DateTime.Now)

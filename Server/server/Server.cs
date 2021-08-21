@@ -59,8 +59,8 @@ namespace Server
             {
                 try
                 {
-                    ArraySegment<byte> data = new ArraySegment<byte>(ArrayPool<byte>.Shared.Rent(4096));
-                    var socketReceive = await SocketTaskExtensions.ReceiveFromAsync(UDPListner, data, SocketFlags.None, new IPEndPoint(IPAddress.Any, 7787)).ConfigureAwait(false);
+                    ArraySegment<byte> data = new ArraySegment<byte>(ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE));
+                    SocketReceiveFromResult socketReceive = await SocketTaskExtensions.ReceiveFromAsync(UDPListner, data, SocketFlags.None, new IPEndPoint(IPAddress.Any, port)).ConfigureAwait(false);
                     if (socketReceive.ReceivedBytes < 4)
                     {
                         continue;
@@ -77,7 +77,7 @@ namespace Server
                     }
                     if (socketReceive.RemoteEndPoint.ToString() == clients[clientId].Udp.endPoint.ToString())
                     {
-                        var packetBytes = new byte[socketReceive.ReceivedBytes];
+                        byte[] packetBytes = ArrayPool<byte>.Shared.Rent(socketReceive.ReceivedBytes);
                         Array.Copy(data.Array, 0, packetBytes, 0, socketReceive.ReceivedBytes);
                         ArrayPool<byte>.Shared.Return(data.Array);
                         clients[clientId].Udp.HandleData(packetBytes);
@@ -94,7 +94,7 @@ namespace Server
         {
             while (true)
             {
-                var item = await Task.Factory.FromAsync(TCPListner.BeginAccept, TCPListner.EndAccept, TCPListner).ConfigureAwait(false);
+                Socket item = await Task.Factory.FromAsync(TCPListner.BeginAccept, TCPListner.EndAccept, TCPListner).ConfigureAwait(false);
                 Console.WriteLine("Client Connected");
                 AddClient(item);
             }
@@ -106,7 +106,7 @@ namespace Server
             {
                 if (!clients.ContainsKey(i))
                 {
-                    var client = new Client(i);
+                    Client client = new Client(i);
                     client.Tcp.Connect(socket);
                     clients.Add(i, client);
                     ServerSend.Welcome(i, "Welcome to server");

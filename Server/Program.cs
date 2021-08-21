@@ -18,7 +18,7 @@ namespace Server
         public static async Task StartUpdateTicks()
         {
             Console.WriteLine("started server ticks");
-            var nextloop = DateTime.Now;
+            DateTime nextloop = DateTime.Now;
             while (isRunning)
             {
                 while (nextloop < DateTime.Now)

@@ -1,4 +1,5 @@
 ﻿using Shared;
+using System.Buffers;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -26,20 +27,21 @@ namespace Server.client
 
         public void HandleData(byte[] data)
         {
-            TickManager.ExecuteOnTick(() =>
-            {
-                using (Packet packet = new Packet(data))
+            Packet packet = new Packet(data);
+            int clientId = packet.ReadInt();
+            int packetId = packet.ReadInt();
+            if(Server.packetHandlers.ContainsKey(packetId))
+                TickManager.ExecuteOnTick(() =>
                 {
-                    int clientId = packet.ReadInt();
-                    int packetId = packet.ReadInt();
                     Server.packetHandlers[packetId].Invoke(id, packet);
-                }
-            });
+                    ArrayPool<byte>.Shared.Return(data);
+                    packet.Dispose();
+                });
         }
 
         public void Disconnect()
         {
-
+            endPoint = null;
         }
     }
 }

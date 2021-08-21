@@ -31,7 +31,7 @@ namespace Server.client
 
         public async Task SendAsync(Packet packet)
         {
-            var buffer = packet.ToArray();
+            byte[] buffer = packet.ToArray();
             await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
         }
 
@@ -40,7 +40,7 @@ namespace Server.client
             while (true)
             {
                 receivedData = new Packet();
-                var receiveBuffer = ArrayPool<byte>.Shared.Rent(4096);
+                byte[] receiveBuffer = ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE);
                 int bytes_read = await stream.ReadAsync(receiveBuffer, 0, Constants.MAX_BUFFER_SIZE).ConfigureAwait(false);
                 if (bytes_read == 0)
                 {
@@ -48,7 +48,7 @@ namespace Server.client
                     continue;
                 }
 
-                byte[] data_read = new byte[bytes_read];
+                byte[] data_read = ArrayPool<byte>.Shared.Rent(bytes_read);
                 Array.Copy(receiveBuffer, data_read, bytes_read);
 
                 receivedData.Reset(HandleData(data_read));
@@ -65,32 +65,35 @@ namespace Server.client
                 packet_length = receivedData.ReadInt();
                 if (packet_length == 0)
                 {
+                    ArrayPool<byte>.Shared.Return(data);
                     return true;
                 }
             }
             while (packet_length > 0 && packet_length <= receivedData.UnreadLength)
             {
                 byte[] packet_Bytes = receivedData.ReadBytes(packet_length);
-                TickManager.ExecuteOnTick(() =>
-                {
-                    using (Packet packet = new Packet(packet_Bytes))
+                Packet packet = new Packet(packet_Bytes);
+                int packet_id = packet.ReadInt();
+                if(Server.packetHandlers.ContainsKey(packet_id))
+                    TickManager.ExecuteOnTick(() =>
                     {
-                        int packet_id = packet.ReadInt();
-                        Server.packetHandlers[packet_id](id, packet);
-                    }
-                });
+                        Server.packetHandlers[packet_id].Invoke(id, packet);
+                        packet.Dispose();
+                    });
                 packet_length = 0;
                 if (receivedData.UnreadLength >= 4)
                 {
                     packet_length = receivedData.ReadInt();
                     if (packet_length == 0)
                     {
+                        ArrayPool<byte>.Shared.Return(data);
                         return true;
                     }
                 }
             }
-            if (packet_length < 0)
+            if (packet_length <= 1)
             {
+                ArrayPool<byte>.Shared.Return(data);
                 return true;
             }
             return false;

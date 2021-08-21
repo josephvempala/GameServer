@@ -13,16 +13,22 @@ namespace Server
         private static void SendTCPPacketToAllButClient(int clientId, Packet packet)
         {
             packet.WriteLength();
-            foreach (var client in Server.clients)
+            foreach (System.Collections.Generic.KeyValuePair<int, client.Client> client in Server.clients)
+            {
                 if (client.Key != clientId)
+                {
                     _ = client.Value.Tcp.SendAsync(packet).ConfigureAwait(false);
+                }
+            }
         }
 
         private static void SendTCPPacketToAll(Packet packet)
         {
             packet.WriteLength();
-            foreach (var client in Server.clients)
+            foreach (System.Collections.Generic.KeyValuePair<int, client.Client> client in Server.clients)
+            {
                 _ = client.Value.Tcp.SendAsync(packet).ConfigureAwait(false);
+            }
         }
 
         private static void SendUDPPacket(int clientId, Packet packet)
@@ -32,15 +38,21 @@ namespace Server
 
         private static void SendUDPPacketToAllButClient(int clientId, Packet packet)
         {
-            foreach (var client in Server.clients)
+            foreach (System.Collections.Generic.KeyValuePair<int, client.Client> client in Server.clients)
+            {
                 if (client.Key != clientId)
+                {
                     _ = client.Value.Udp.SendAsync(packet).ConfigureAwait(false);
+                }
+            }
         }
 
         private static void SendUDPPacketToAll(Packet packet)
         {
-            foreach (var client in Server.clients)
+            foreach (System.Collections.Generic.KeyValuePair<int, client.Client> client in Server.clients)
+            {
                 _ = client.Value.Udp.SendAsync(packet).ConfigureAwait(false);
+            }
         }
 
         public static void Welcome(int clientId, string message)
