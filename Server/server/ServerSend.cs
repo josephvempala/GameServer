@@ -1,4 +1,5 @@
-﻿using Shared;
+﻿using Server.client;
+using Shared;
 
 namespace Server
 {
@@ -73,6 +74,19 @@ namespace Server
                 packet.Write(message);
                 SendUDPPacketToAll(packet);
             }
+        }
+
+        public static void SpawnPlayer(int toClient, Player player)
+        {
+            using (Packet packet = new Packet((int)ServerPackets.spawnPlayer))
+            {
+                packet.Write(player.id);
+                packet.Write(player.username);
+                packet.Write(player.position);
+                packet.Write(player.rotation);
+
+                SendTCPPacket(toClient, packet);
+            };
         }
     }
 }

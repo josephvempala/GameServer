@@ -37,22 +37,31 @@ namespace Server.client
 
         private async Task ReceiveLoop()
         {
-            while (true)
+            try
             {
-                receivedData = new Packet();
-                byte[] receiveBuffer = ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE);
-                int bytes_read = await stream.ReadAsync(receiveBuffer, 0, Constants.MAX_BUFFER_SIZE).ConfigureAwait(false);
-                if (bytes_read == 0)
+                while (true)
                 {
-                    Server.clients[id].Disconnect();
-                    continue;
+                    receivedData = new Packet();
+                    byte[] receiveBuffer = ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE);
+                    int bytes_read = await stream.ReadAsync(receiveBuffer, 0, Constants.MAX_BUFFER_SIZE).ConfigureAwait(false);
+                    if (bytes_read == 0)
+                    {
+                        Server.clients[id].Disconnect();
+                        continue;
+                    }
+
+                    byte[] data_read = ArrayPool<byte>.Shared.Rent(bytes_read);
+                    Array.Copy(receiveBuffer, data_read, bytes_read);
+
+                    receivedData.Reset(HandleData(data_read));
                 }
-
-                byte[] data_read = ArrayPool<byte>.Shared.Rent(bytes_read);
-                Array.Copy(receiveBuffer, data_read, bytes_read);
-
-                receivedData.Reset(HandleData(data_read));
             }
+            catch (Exception ex)
+            {
+                Server.clients[id].Disconnect();
+                Console.WriteLine(ex.Message);
+            }
+            
         }
 
         private bool HandleData(byte[] data)
