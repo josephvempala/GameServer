@@ -47,7 +47,7 @@ namespace Client
                         continue;
                     }
                     byte[] received_buffer = ArrayPool<byte>.Shared.Rent(socketData.ReceivedBytes);
-                    Array.Copy(udpBuffer, received_buffer, socketData.ReceivedBytes);
+                    Buffer.BlockCopy(udpBuffer, 0, received_buffer, 0, socketData.ReceivedBytes);
                     ArrayPool<byte>.Shared.Return(udpBuffer);
                     HandleData(udpBuffer);
                 }

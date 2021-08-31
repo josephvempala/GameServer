@@ -66,7 +66,7 @@ namespace Client
                     }
 
                     byte[] data_read = ArrayPool<byte>.Shared.Rent(bytes_read);
-                    Array.Copy(receiveBuffer, data_read, bytes_read);
+                    Buffer.BlockCopy(receiveBuffer, 0, data_read, 0, bytes_read);
                     ArrayPool<byte>.Shared.Return(receiveBuffer);
                     receivedData.Reset(HandleData(data_read));
                 }

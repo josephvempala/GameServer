@@ -78,7 +78,7 @@ namespace Server
                     if (socketReceive.RemoteEndPoint.ToString() == clients[clientId].Udp.endPoint.ToString())
                     {
                         byte[] packetBytes = ArrayPool<byte>.Shared.Rent(socketReceive.ReceivedBytes);
-                        Array.Copy(data.Array, 0, packetBytes, 0, socketReceive.ReceivedBytes);
+                        Buffer.BlockCopy(data.Array, 0, packetBytes, 0, socketReceive.ReceivedBytes);
                         ArrayPool<byte>.Shared.Return(data.Array);
                         clients[clientId].Udp.HandleData(packetBytes);
                     }
@@ -95,7 +95,7 @@ namespace Server
             while (true)
             {
                 Socket item = await Task.Factory.FromAsync(TCPListner.BeginAccept, TCPListner.EndAccept, TCPListner).ConfigureAwait(false);
-                Console.WriteLine("Client Connected");
+                Console.WriteLine($"Client {item.RemoteEndPoint} Connected");
                 AddClient(item);
             }
         }

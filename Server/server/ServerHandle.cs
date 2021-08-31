@@ -7,7 +7,6 @@ namespace Server
     {
         public static void WelcomeReceived(int client_id, Packet packet)
         {
-            int id = packet.ReadInt();
             string username = packet.ReadString();
             Console.WriteLine($"{client_id} says {username}");
             Server.clients[client_id].SendIntoGame(username);
