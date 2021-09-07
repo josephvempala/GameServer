@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server
@@ -20,11 +21,13 @@ namespace Server
         private static Socket TCPListner;
         private static Socket UDPListner;
         private static IPEndPoint ServerEndpoint;
+        private static CancellationTokenSource cancellationTokenSource;
 
         public static void Start(int maximum_clients, int port_no)
         {
             max_clients = maximum_clients;
             port = port_no;
+            cancellationTokenSource = new CancellationTokenSource(); 
             InitializePacketHandlers();
 
             ServerEndpoint = new IPEndPoint(IPAddress.Any, port);
@@ -44,7 +47,7 @@ namespace Server
             {
                 if (endPoint != null)
                 {
-                    await SocketTaskExtensions.SendToAsync(UDPListner, new ArraySegment<byte>(packet.ToArray()), SocketFlags.None, endPoint).ConfigureAwait(false);
+                    await UDPListner.SendToAsync(new ArraySegment<byte>(packet.ToArray()), SocketFlags.None, endPoint).ConfigureAwait(false);
                 }
             }
             catch (Exception e)
@@ -53,14 +56,23 @@ namespace Server
             }
         }
 
+        public static void Stop()
+        {
+            cancellationTokenSource.Cancel();
+            foreach(var client in clients)
+            {
+                client.Value.Disconnect();
+            }
+        }
+
         private static async Task UDPListen()
         {
-            while (true)
+            while (!cancellationTokenSource.Token.IsCancellationRequested)
             {
                 try
                 {
                     ArraySegment<byte> data = new ArraySegment<byte>(ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE));
-                    SocketReceiveFromResult socketReceive = await SocketTaskExtensions.ReceiveFromAsync(UDPListner, data, SocketFlags.None, new IPEndPoint(IPAddress.Any, port)).ConfigureAwait(false);
+                    SocketReceiveFromResult socketReceive = await UDPListner.ReceiveFromAsync(data, SocketFlags.None, ServerEndpoint).ConfigureAwait(false);
                     if (socketReceive.ReceivedBytes < 4)
                     {
                         continue;
@@ -92,7 +104,7 @@ namespace Server
 
         private static async Task TCPListen()
         {
-            while (true)
+            while (!cancellationTokenSource.Token.IsCancellationRequested)
             {
                 Socket item = await Task.Factory.FromAsync(TCPListner.BeginAccept, TCPListner.EndAccept, TCPListner).ConfigureAwait(false);
                 Console.WriteLine($"Client {item.RemoteEndPoint} Connected");

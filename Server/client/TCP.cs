@@ -2,12 +2,14 @@
 using System;
 using System.Buffers;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server.client
 {
     public class TCP
     {
+        private CancellationTokenSource cancellationTokenSource;
         private Socket socket;
         private NetworkStream stream;
         private Packet receivedData;
@@ -16,6 +18,7 @@ namespace Server.client
         public TCP(int id)
         {
             this.id = id;
+            cancellationTokenSource = new CancellationTokenSource();
         }
 
         public void Connect(Socket socket)
@@ -39,7 +42,7 @@ namespace Server.client
         {
             try
             {
-                while (true)
+                while (!cancellationTokenSource.Token.IsCancellationRequested)
                 {
                     receivedData = new Packet();
                     byte[] receiveBuffer = ArrayPool<byte>.Shared.Rent(Constants.MAX_BUFFER_SIZE);
@@ -109,6 +112,7 @@ namespace Server.client
 
         public void Disconnect()
         {
+            cancellationTokenSource.Cancel();
             socket.Close();
             stream.Close();
             receivedData.Dispose();
